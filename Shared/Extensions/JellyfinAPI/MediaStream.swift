@@ -24,8 +24,17 @@ extension MediaStream {
 
         guard let fullURL = client.fullURL(with: deliveryPath) else { return nil }
 
+        let proxiedURL: URL = {
+            switch fullURL.scheme?.lowercased() {
+            case "http", "https":
+                return LocalMediaProxyService.shared.proxiedURL(for: fullURL)
+            default:
+                return fullURL
+            }
+        }()
+
         return .init(
-            url: fullURL,
+            url: proxiedURL,
             type: .subtitle,
             enforce: false
         )

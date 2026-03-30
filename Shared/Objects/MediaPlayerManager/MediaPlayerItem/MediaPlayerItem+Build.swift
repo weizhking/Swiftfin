@@ -117,13 +117,22 @@ extension MediaPlayerItem {
             throw ErrorMessage("No associated play session ID")
         }
 
-        let playbackURL = try Self.streamURL(
+        let remotePlaybackURL = try Self.streamURL(
             item: item,
             mediaSource: mediaSource,
             playSessionID: playSessionID,
             userSession: userSession,
             logger: logger
         )
+
+        let playbackURL: URL = {
+            switch remotePlaybackURL.scheme?.lowercased() {
+            case "http", "https":
+                return LocalMediaProxyService.shared.proxiedURL(for: remotePlaybackURL)
+            default:
+                return remotePlaybackURL
+            }
+        }()
 
         let previewImageProvider: (any PreviewImageProvider)? = {
             let previewImageScrubbingSetting = StoredValues[.User.previewImageScrubbing]
