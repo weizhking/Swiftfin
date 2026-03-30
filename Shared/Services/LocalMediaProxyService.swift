@@ -21,6 +21,7 @@ final class LocalMediaProxyService {
 
     private var listener: NWListener?
     private var isStarted = false
+    private var activeConnections: [UUID: ProxyConnection] = [:]
 
     private init() {
         start()
@@ -68,7 +69,10 @@ final class LocalMediaProxyService {
 
                 listener.newConnectionHandler = { [weak self] connection in
                     guard let self else { return }
-                    ProxyConnection(service: self, connection: connection).start()
+                    self.logger.info("Local media proxy accepted a new local connection")
+                    let proxyConnection = ProxyConnection(service: self, connection: connection)
+                    self.register(proxyConnection)
+                    proxyConnection.start()
                 }
 
                 listener.start(queue: queue)
@@ -80,11 +84,56 @@ final class LocalMediaProxyService {
             }
         }
     }
+
+    func healthCheckURL() -> URL? {
+        var components = URLComponents()
+        components.scheme = "http"
+        components.host = host
+        components.port = Int(port)
+        components.path = "/health"
+        return components.url
+    }
+
+    func runSelfTest() {
+        guard let healthCheckURL else { return }
+
+        let request = URLRequest(url: healthCheckURL, timeoutInterval: 5)
+
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error {
+                self.logger.error("Local media proxy self-test failed: \(error.localizedDescription)")
+                return
+            }
+
+            guard let response = response as? HTTPURLResponse else {
+                self.logger.error("Local media proxy self-test returned invalid response")
+                return
+            }
+
+            let body = data.flatMap { String(data: $0, encoding: .utf8) } ?? ""
+            self.logger.info("Local media proxy self-test status=\(response.statusCode) body=\(body)")
+        }
+        .resume()
+    }
+
+    private func register(_ connection: ProxyConnection) {
+        queue.async {
+            self.activeConnections[connection.id] = connection
+        }
+    }
+
+    fileprivate func unregister(_ id: UUID) {
+        queue.async {
+            self.activeConnections.removeValue(forKey: id)
+        }
+    }
 }
 
 private extension LocalMediaProxyService {
 
     final class ProxyConnection {
+
+        let id = UUID()
 
         private let service: LocalMediaProxyService
         private let connection: NWConnection
@@ -169,6 +218,12 @@ private extension LocalMediaProxyService {
         }
 
         private func forward(_ request: ProxyRequest) {
+            if request.target == "/health" {
+                service.logger.info("Local media proxy health check served")
+                respond(statusCode: 200, body: Data("ok".utf8))
+                return
+            }
+
             guard let targetURL = remoteURL(from: request.target) else {
                 respond(statusCode: 400, body: Data("Missing remote URL".utf8))
                 return
@@ -236,6 +291,7 @@ private extension LocalMediaProxyService {
 
         private func finish() {
             connection.cancel()
+            service.unregister(id)
         }
     }
 

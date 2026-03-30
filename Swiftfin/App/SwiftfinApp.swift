@@ -68,6 +68,7 @@ struct SwiftfinApp: App {
         // Swiftfin
 
         _ = LocalMediaProxyService.shared
+        LocalMediaProxyService.shared.runSelfTest()
 
         // don't keep last user id
         if Defaults[.signOutOnClose] {
