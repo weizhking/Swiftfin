@@ -39,7 +39,9 @@ final class LocalMediaProxyService {
             URLQueryItem(name: "url", value: remoteURL.absoluteString)
         ]
 
-        return components.url ?? remoteURL
+        let proxiedURL = components.url ?? remoteURL
+        logger.debug("Local media proxy rewrote URL \(remoteURL.absoluteString) -> \(proxiedURL.absoluteString)")
+        return proxiedURL
     }
 
     private func start() {
@@ -172,6 +174,8 @@ private extension LocalMediaProxyService {
                 return
             }
 
+            service.logger.info("Local media proxy forwarding \(request.method) \(targetURL.absoluteString)")
+
             let delegate = ProxyRequestDelegate(
                 service: service,
                 connection: connection,
@@ -201,6 +205,8 @@ private extension LocalMediaProxyService {
                     urlRequest.setValue(value, forHTTPHeaderField: header)
                 }
             }
+
+            urlRequest.setValue("identity", forHTTPHeaderField: "Accept-Encoding")
 
             session.dataTask(with: urlRequest).resume()
         }
@@ -280,6 +286,10 @@ private extension LocalMediaProxyService {
             self.response = response
             self.shouldRewritePlaylist = shouldRewrite(response: response, remoteURL: remoteURL)
 
+            service.logger.info(
+                "Local media proxy received response \(response.statusCode) for \(remoteURL.absoluteString) rewritePlaylist=\(shouldRewritePlaylist)"
+            )
+
             if !shouldRewritePlaylist {
                 sendHeaders(for: response, contentLength: response.expectedContentLength >= 0 ? Int(response.expectedContentLength) : nil)
             }
@@ -312,6 +322,7 @@ private extension LocalMediaProxyService {
 
             if shouldRewritePlaylist {
                 let body = rewrittenPlaylistData(from: playlistBuffer, remoteURL: remoteURL)
+                service.logger.info("Local media proxy rewrote playlist for \(remoteURL.absoluteString) bytes=\(body.count)")
                 sendHeaders(for: response, contentLength: body.count)
 
                 if requestMethod.uppercased() != "HEAD" {
@@ -322,6 +333,7 @@ private extension LocalMediaProxyService {
                     finish(session: session)
                 }
             } else {
+                service.logger.info("Local media proxy finished passthrough for \(remoteURL.absoluteString)")
                 finish(session: session)
             }
         }
@@ -352,7 +364,7 @@ private extension LocalMediaProxyService {
                 guard let key = key as? String else { continue }
                 let lowerKey = key.lowercased()
 
-                if lowerKey == "connection" || lowerKey == "transfer-encoding" || lowerKey == "content-length" {
+                if lowerKey == "connection" || lowerKey == "transfer-encoding" || lowerKey == "content-length" || lowerKey == "content-encoding" {
                     continue
                 }
 

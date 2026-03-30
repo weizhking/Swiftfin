@@ -134,6 +134,8 @@ extension MediaPlayerItem {
             }
         }()
 
+        logger.info("Playback URL prepared for item \(itemID): remote=\(remotePlaybackURL.absoluteString) proxy=\(playbackURL.absoluteString)")
+
         let previewImageProvider: (any PreviewImageProvider)? = {
             let previewImageScrubbingSetting = StoredValues[.User.previewImageScrubbing]
             lazy var chapterPreviewImageProvider: ChapterPreviewImageProvider? = {
