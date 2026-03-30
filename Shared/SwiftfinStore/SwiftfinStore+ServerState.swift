@@ -42,7 +42,7 @@ extension SwiftfinStore.State {
             JellyfinClient(
                 configuration: .swiftfinConfiguration(url: currentURL),
                 sessionConfiguration: .swiftfin,
-                sessionDelegate: URLSessionProxyDelegate(logger: NetworkLogger.swiftfin())
+                sessionDelegate: SwiftfinNetworking.sessionDelegate()
             )
         }
     }

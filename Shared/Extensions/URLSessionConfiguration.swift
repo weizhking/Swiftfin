@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import Pulse
 
 extension URLSessionConfiguration {
 
@@ -15,4 +16,32 @@ extension URLSessionConfiguration {
     static let swiftfin: URLSessionConfiguration = {
         .default.mutating(\.timeoutIntervalForRequest, with: 20)
     }()
+}
+
+enum SwiftfinNetworking {
+
+    static func sessionDelegate() -> URLSessionProxyDelegate {
+        URLSessionProxyDelegate(
+            logger: NetworkLogger.swiftfin(),
+            delegate: HTTPSCompatibilityDelegate()
+        )
+    }
+}
+
+private final class HTTPSCompatibilityDelegate: NSObject, URLSessionDelegate {
+
+    func urlSession(
+        _ session: URLSession,
+        didReceive challenge: URLAuthenticationChallenge,
+        completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+    ) {
+        guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
+              let trust = challenge.protectionSpace.serverTrust
+        else {
+            completionHandler(.performDefaultHandling, nil)
+            return
+        }
+
+        completionHandler(.useCredential, URLCredential(trust: trust))
+    }
 }

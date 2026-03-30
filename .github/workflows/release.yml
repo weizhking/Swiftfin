@@ -1,0 +1,72 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.scheme }}
+    strategy:
+      matrix:
+        scheme:
+          - "Swiftfin"
+          - "Swiftfin tvOS"
+
+    runs-on: macos-15
+
+    env:
+      XCODE_VERSION: "26.2"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install SwiftGen
+        run: brew install swiftgen
+
+      - name: Cache Carthage
+        uses: actions/cache@v4
+        with:
+          path: Carthage
+          key: ${{ runner.os }}-release-carthage-${{ hashFiles('**/Cartfile.resolved') }}
+          restore-keys: ${{ runner.os }}-release-carthage-
+
+      - name: Update Carthage
+        run: carthage update --use-xcframeworks --cache-builds
+
+      - name: Build
+        uses: nick-fields/retry@v2
+        with:
+          max_attempts: 3
+          retry_on: error
+          timeout_minutes: 60
+          command: sudo fastlane buildLane \
+            scheme:"\"${{ matrix.scheme }}\"" \
+            xcodeVersion:${{ env.XCODE_VERSION }}
+
+  release:
+    name: Publish Release
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create source archive
+        run: git archive --format=zip --output "Swiftfin-${GITHUB_REF_NAME}.zip" HEAD
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: Swiftfin-${{ github.ref_name }}.zip
+          generate_release_notes: true

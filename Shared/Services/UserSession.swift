@@ -31,7 +31,7 @@ final class UserSession {
                 accessToken: user.accessToken
             ),
             sessionConfiguration: .swiftfin,
-            sessionDelegate: URLSessionProxyDelegate(logger: NetworkLogger.swiftfin())
+            sessionDelegate: SwiftfinNetworking.sessionDelegate()
         )
 
         self.client = client

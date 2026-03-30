@@ -55,10 +55,7 @@ extension ImagePipeline.Swiftfin {
         let dataLoader = DataLoader(
             configuration: .swiftfin
         )
-        dataLoader.delegate = URLSessionProxyDelegate(
-            logger: NetworkLogger.swiftfin(),
-            delegate: nil
-        )
+        dataLoader.delegate = SwiftfinNetworking.sessionDelegate()
         config.dataLoader = dataLoader
     }
 
@@ -70,10 +67,7 @@ extension ImagePipeline.Swiftfin {
         let dataLoader = DataLoader(
             configuration: .swiftfin
         )
-        dataLoader.delegate = URLSessionProxyDelegate(
-            logger: NetworkLogger.swiftfin(),
-            delegate: nil
-        )
+        dataLoader.delegate = SwiftfinNetworking.sessionDelegate()
         config.dataLoader = dataLoader
     }
 
