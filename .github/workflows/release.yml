@@ -10,8 +10,8 @@ permissions:
 
 jobs:
   release:
-    name: Publish Release
-    runs-on: ubuntu-latest
+    name: Build Unsigned iOS IPA
+    runs-on: macos-15
 
     steps:
       - name: Checkout
@@ -19,11 +19,41 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Create source archive
-        run: git archive --format=zip --output "Swiftfin-${GITHUB_REF_NAME}.zip" HEAD
+      - name: Install SwiftGen
+        run: brew install swiftgen
+
+      - name: Cache Carthage
+        uses: actions/cache@v4
+        with:
+          path: Carthage
+          key: ${{ runner.os }}-release-carthage-${{ hashFiles('**/Cartfile.resolved') }}
+          restore-keys: ${{ runner.os }}-release-carthage-
+
+      - name: Update Carthage
+        run: carthage update --use-xcframeworks --cache-builds
+
+      - name: Archive unsigned iOS app
+        run: |
+          xcodebuild archive \
+            -project Swiftfin.xcodeproj \
+            -scheme "Swiftfin" \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -archivePath "$RUNNER_TEMP/Swiftfin.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            -skipMacroValidation
+
+      - name: Package unsigned IPA
+        run: |
+          mkdir -p Payload
+          cp -R "$RUNNER_TEMP/Swiftfin.xcarchive/Products/Applications/Swiftfin iOS.app" Payload/
+          /usr/bin/zip -r "Swiftfin-${GITHUB_REF_NAME}-unsigned.ipa" Payload
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: Swiftfin-${{ github.ref_name }}.zip
+          files: Swiftfin-${{ github.ref_name }}-unsigned.ipa
           generate_release_notes: true
