@@ -28,7 +28,7 @@ enum SwiftfinNetworking {
     }
 }
 
-private final class HTTPSCompatibilityDelegate: NSObject, URLSessionDelegate {
+private final class HTTPSCompatibilityDelegate: NSObject, URLSessionDelegate, URLSessionTaskDelegate {
 
     func urlSession(
         _ session: URLSession,
