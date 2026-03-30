@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import Logging
 import Pulse
 
 extension URLSessionConfiguration {
@@ -30,19 +31,40 @@ enum SwiftfinNetworking {
 
 private final class HTTPSCompatibilityDelegate: NSObject, URLSessionDelegate, URLSessionTaskDelegate {
 
+    private let logger = Logger.swiftfin()
+
+    private func handleChallenge(
+        source: String,
+        challenge: URLAuthenticationChallenge,
+        completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+    ) {
+        let host = challenge.protectionSpace.host
+        let method = challenge.protectionSpace.authenticationMethod
+
+        logger.info("TLS challenge received [\(source)] host=\(host) method=\(method)")
+
+        guard method == NSURLAuthenticationMethodServerTrust,
+              let trust = challenge.protectionSpace.serverTrust
+        else {
+            logger.warning("TLS challenge default handling [\(source)] host=\(host) method=\(method)")
+            completionHandler(.performDefaultHandling, nil)
+            return
+        }
+
+        logger.info("TLS challenge accepted [\(source)] host=\(host)")
+        completionHandler(.useCredential, URLCredential(trust: trust))
+    }
+
     func urlSession(
         _ session: URLSession,
         didReceive challenge: URLAuthenticationChallenge,
         completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
     ) {
-        guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
-              let trust = challenge.protectionSpace.serverTrust
-        else {
-            completionHandler(.performDefaultHandling, nil)
-            return
-        }
-
-        completionHandler(.useCredential, URLCredential(trust: trust))
+        handleChallenge(
+            source: "session",
+            challenge: challenge,
+            completionHandler: completionHandler
+        )
     }
 
     func urlSession(
@@ -51,13 +73,10 @@ private final class HTTPSCompatibilityDelegate: NSObject, URLSessionDelegate, UR
         didReceive challenge: URLAuthenticationChallenge,
         completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
     ) {
-        guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
-              let trust = challenge.protectionSpace.serverTrust
-        else {
-            completionHandler(.performDefaultHandling, nil)
-            return
-        }
-
-        completionHandler(.useCredential, URLCredential(trust: trust))
+        handleChallenge(
+            source: "task",
+            challenge: challenge,
+            completionHandler: completionHandler
+        )
     }
 }
