@@ -50,8 +50,7 @@ extension VideoPlayer.PlaybackControls {
             }
             .trackingSize($trailingTimestampSize)
             .frame(maxWidth: .infinity, alignment: .trailing)
-            .debugBackground()
-            .overlay(alignment: .leading) {
+            .overlay(alignment: Alignment.leading) {
                 Text(scrubbedSeconds, format: .runtime)
                     .trackingSize($leadingTimestampSize)
                     .offset(x: previewXOffset)
