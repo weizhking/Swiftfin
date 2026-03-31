@@ -30,9 +30,9 @@ extension URL {
         URL(string: NSTemporaryDirectory())!
     }
 
-    static let swiftfinGithub: URL = URL(string: "https://github.com/jellyfin/Swiftfin")!
+    static let swiftfinGithub: URL = URL(string: "https://github.com/weizhking/Swiftfin-HTTPS")!
 
-    static let swiftfinGithubIssues: URL = URL(string: "https://github.com/jellyfin/Swiftfin/issues")!
+    static let swiftfinGithubIssues: URL = URL(string: "https://github.com/weizhking/Swiftfin-HTTPS/issues")!
 
     static let jellyfinDocsDevices: URL = URL(string: "https://jellyfin.org/docs/general/server/devices")!
 

@@ -18,20 +18,26 @@
 </div>
 
 <p align="center">
-  <b>Swiftfin</b> is a modern video client for the <a href="https://github.com/jellyfin/jellyfin">Jellyfin</a> media server. Made using Swift to maximize direct play with the power of <b>VLC</b> and look <b>native</b> on all classes of Apple devices.
+  <b>Swiftfin-HTTPS</b> is a Swiftfin fork for <a href="https://github.com/jellyfin/jellyfin">Jellyfin</a> servers that use <b>self-signed</b> or <b>untrusted HTTPS certificates</b>. It is intended for self-hosted environments where the official client may fail with certificate errors such as <b>certificate invalid</b>, <b>server certificate untrusted</b>, or playback failures caused by custom HTTPS setups.
 </p>
 
-## Custom Fork Notes
+## Fork Focus
 
-This fork is maintained for personal use based on the upstream `1.4` tag.
+This fork is currently based on the upstream `1.4` tag.
 
-The main customizations in this fork are:
+It specifically targets these scenarios:
 
-- allows connecting to Jellyfin servers that use untrusted or self-signed HTTPS certificates
-- proxies media playback through a local `127.0.0.1` bridge so iOS playback can work with those HTTPS servers
-- publishes unsigned iOS `.ipa` files through GitHub Releases for re-signing with your own tools or certificates
+- Jellyfin servers behind self-signed HTTPS
+- Jellyfin servers using untrusted HTTPS certificates
+- reverse proxy / custom HTTPS setups where official iOS playback may fail
 
-See [Documentation/custom-release.md](./Documentation/custom-release.md) for the release workflow and usage notes.
+The main changes in this fork are:
+
+- API requests accept self-signed or untrusted HTTPS certificates
+- media playback is routed through a local `127.0.0.1` proxy so playback can work even when the remote server certificate is not trusted by iOS/tvOS
+- GitHub Releases publish unsigned iOS and tvOS build assets
+
+See [Documentation/custom-release.md](./Documentation/custom-release.md) for the custom release workflow and fork-specific notes.
 
 ## ⚡️ Download
 

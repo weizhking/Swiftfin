@@ -1,10 +1,10 @@
 # Custom Release Notes
 
-This repository is a personal fork of `jellyfin/Swiftfin`, currently based on the upstream `1.4` tag.
+This repository is a public fork of `jellyfin/Swiftfin`, currently based on the upstream `1.4` tag.
 
 ## Purpose
 
-This fork exists to support a Jellyfin server that:
+This fork exists to support Jellyfin servers that:
 
 - is exposed over `HTTPS`
 - uses an untrusted or self-signed certificate
@@ -26,19 +26,12 @@ The release workflow is defined in [release.yml](../.github/workflows/release.ym
 
 ## Installation
 
-The generated `.ipa` is unsigned for distribution purposes.
+The release workflow publishes:
 
-Typical usage is:
+- an unsigned iOS `.ipa`
+- an unsigned tvOS `.app` bundle packaged as `.zip`
 
-1. Download the `.ipa` from GitHub Releases.
-2. Re-sign it with your own certificate, signing service, or local signing tool.
-3. Install it on your iPhone or iPad.
-
-For Apple TV / tvOS:
-
-1. Download the tvOS `.zip` asset from GitHub Releases.
-2. Extract the contained `Swiftfin tvOS.app`.
-3. Re-sign it with your own tooling if needed for your deployment flow.
+These assets are intended as build outputs for this custom fork.
 
 ## Versioning
 
@@ -52,6 +45,6 @@ The intent is to preserve the upstream `1.4` base while making custom fork build
 
 ## Notes
 
-- This fork is intended for personal/self-hosted use.
+- This fork is intended for self-hosted Jellyfin environments that need self-signed or untrusted HTTPS support.
 - The custom HTTPS handling is less secure than using a certificate trusted by iOS.
 - If you can move the server to a certificate chain that iOS already trusts, that remains the cleaner long-term solution.
