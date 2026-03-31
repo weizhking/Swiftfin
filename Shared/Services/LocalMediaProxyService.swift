@@ -51,8 +51,12 @@ final class LocalMediaProxyService {
 
             do {
                 let parameters = NWParameters.tcp
+                guard let listenerPort = NWEndpoint.Port(rawValue: port) else {
+                    logger.error("Unable to create local media proxy port from \(self.port)")
+                    return
+                }
 
-                let listener = try NWListener(using: parameters, on: NWEndpoint.Port(integerLiteral: port))
+                let listener = try NWListener(using: parameters, on: listenerPort)
 
                 listener.stateUpdateHandler = { [weak self] state in
                     guard let self else { return }
@@ -95,7 +99,7 @@ final class LocalMediaProxyService {
     }
 
     func runSelfTest() {
-        guard let healthCheckURL else { return }
+        guard let healthCheckURL = healthCheckURL() else { return }
 
         let request = URLRequest(url: healthCheckURL, timeoutInterval: 5)
 
