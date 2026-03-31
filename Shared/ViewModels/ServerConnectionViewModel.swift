@@ -90,10 +90,6 @@ final class ServerConnectionViewModel: ViewModel {
         let state = checkState(for: url)
         var parts: [String] = []
 
-        if server.currentURL == url {
-            parts.append("Current")
-        }
-
         switch state.kind {
         case .idle:
             if parts.isEmpty {
