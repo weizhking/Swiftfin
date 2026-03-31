@@ -49,7 +49,7 @@ struct EditServerView: View {
                 }
             }
 
-            Section(L10n.url) {
+            Section(content: {
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         isURLSectionExpanded.toggle()
@@ -110,7 +110,9 @@ struct EditServerView: View {
                         serverURLRow(url)
                     }
                 }
-            } footer: {
+            }, header: {
+                Text(L10n.url)
+            }, footer: {
                 if !viewModel.server.isVersionCompatible {
                     Label(
                         L10n.serverVersionWarning(JellyfinClient.sdkVersion.majorMinor.description),
@@ -118,7 +120,7 @@ struct EditServerView: View {
                     )
                     .labelStyle(.sectionFooterWithImage(imageStyle: .orange))
                 }
-            }
+            })
 
             if isEditing {
                 ListRowButton(L10n.delete) {
