@@ -37,7 +37,7 @@ final class LocalMediaProxyService {
         components.port = Int(port)
         components.path = "/proxy"
         components.queryItems = [
-            URLQueryItem(name: "url", value: remoteURL.absoluteString)
+            URLQueryItem(name: "target", value: encodedTarget(for: remoteURL))
         ]
 
         let proxiedURL = components.url ?? remoteURL
@@ -130,6 +130,33 @@ final class LocalMediaProxyService {
         queue.async {
             self.activeConnections.removeValue(forKey: id)
         }
+    }
+
+    private func encodedTarget(for remoteURL: URL) -> String {
+        let base64 = Data(remoteURL.absoluteString.utf8).base64EncodedString()
+        return base64
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+    }
+
+    fileprivate func decodedTarget(from value: String) -> URL? {
+        var base64 = value
+            .replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+
+        let remainder = base64.count % 4
+        if remainder != 0 {
+            base64.append(String(repeating: "=", count: 4 - remainder))
+        }
+
+        guard let data = Data(base64Encoded: base64),
+              let string = String(data: data, encoding: .utf8)
+        else {
+            return nil
+        }
+
+        return URL(string: string)
     }
 }
 
@@ -272,12 +299,25 @@ private extension LocalMediaProxyService {
 
         private func remoteURL(from target: String) -> URL? {
             guard let components = URLComponents(string: "http://localhost\(target)"),
-                  let encodedURL = components.queryItems?.first(where: { $0.name == "url" })?.value
+                  let queryItems = components.queryItems
             else {
                 return nil
             }
 
-            return URL(string: encodedURL)
+            if let encodedTarget = queryItems.first(where: { $0.name == "target" })?.value {
+                if let decodedTarget = service.decodedTarget(from: encodedTarget) {
+                    return decodedTarget
+                }
+
+                service.logger.error("Local media proxy failed to decode target parameter")
+                return nil
+            }
+
+            if let legacyEncodedURL = queryItems.first(where: { $0.name == "url" })?.value {
+                return URL(string: legacyEncodedURL)
+            }
+
+            return nil
         }
 
         private func respond(statusCode: Int, body: Data) {

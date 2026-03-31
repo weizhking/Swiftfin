@@ -148,6 +148,15 @@ extension VLCMediaPlayerProxy {
                 .filter { $0.deliveryMethod == .external }
                 .compactMap(\.asVLCPlaybackChild)
 
+            manager.logger.info(
+                "Prepared VLC playback configuration",
+                metadata: [
+                    "itemID": .stringConvertible(baseItem.id ?? "Unknown"),
+                    "url": .stringConvertible(configuration.url.absoluteString),
+                    "subtitleChildCount": .stringConvertible(configuration.playbackChildren.count),
+                ]
+            )
+
             return configuration
         }
 
