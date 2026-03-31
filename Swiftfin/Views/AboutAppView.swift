@@ -20,7 +20,7 @@ struct AboutAppView: View {
                         .aspectRatio(1, contentMode: .fit)
                         .frame(height: 150)
 
-                    Text(verbatim: "Swiftfin")
+                    Text(verbatim: "Swiftfin-HTTPS")
                         .fontWeight(.semibold)
                         .font(.title2)
                 }
