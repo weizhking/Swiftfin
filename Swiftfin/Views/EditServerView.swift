@@ -50,54 +50,69 @@ struct EditServerView: View {
             }
 
             Section {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        isURLSectionExpanded.toggle()
-                    }
-                } label: {
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(viewModel.server.currentURL.absoluteString)
-                                .foregroundStyle(.primary)
-                                .multilineTextAlignment(.leading)
+                HStack(spacing: 12) {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            isURLSectionExpanded.toggle()
+                        }
+                    } label: {
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(viewModel.server.currentURL.absoluteString)
+                                    .foregroundStyle(.primary)
+                                    .multilineTextAlignment(.leading)
 
-                            Text("\(viewModel.prioritizedURLs.count) saved URLs")
-                                .font(.caption)
+                                Text("\(viewModel.prioritizedURLs.count) saved URLs")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Spacer()
+
+                            Image(systemName: isURLSectionExpanded ? "chevron.up" : "chevron.down")
+                                .font(.footnote.weight(.semibold))
                                 .foregroundStyle(.secondary)
                         }
-
-                        Spacer()
-
-                        Image(systemName: isURLSectionExpanded ? "chevron.up" : "chevron.down")
-                            .font(.footnote.weight(.semibold))
-                            .foregroundStyle(.secondary)
                     }
-                }
-                .buttonStyle(.plain)
+                    .buttonStyle(.plain)
 
-                if isURLSectionExpanded {
                     Button {
                         Task {
                             await viewModel.testAllURLs()
                         }
                     } label: {
-                        HStack {
-                            Label("Test All URLs", systemImage: "arrow.triangle.2.circlepath.circle")
-                            Spacer()
+                        Group {
                             if viewModel.isTestingAllURLs {
                                 ProgressView()
+                            } else {
+                                Image(systemName: "arrow.triangle.2.circlepath.circle")
                             }
                         }
+                        .frame(width: 24, height: 24)
                     }
+                    .buttonStyle(.borderless)
                     .disabled(viewModel.isTestingAllURLs || viewModel.isResolvingBestURL)
 
+                    Button {
+                        Task {
+                            await viewModel.sortURLsByBitrate()
+                        }
+                    } label: {
+                        Image(systemName: "chart.bar")
+                            .frame(width: 24, height: 24)
+                    }
+                    .buttonStyle(.borderless)
+                    .disabled(viewModel.isTestingAllURLs || viewModel.isResolvingBestURL)
+                }
+
+                if isURLSectionExpanded {
                     Button {
                         Task {
                             await viewModel.selectBestURL()
                         }
                     } label: {
                         HStack {
-                            Label("Select Best Available URL", systemImage: "checkmark.circle")
+                            Label("Use Priority Order", systemImage: "checkmark.circle")
                             Spacer()
                             if viewModel.isResolvingBestURL {
                                 ProgressView()
@@ -160,25 +175,63 @@ struct EditServerView: View {
         let state = viewModel.checkState(for: url)
 
         HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(url.absoluteString)
-                    .foregroundStyle(.primary)
-                    .multilineTextAlignment(.leading)
+            Button {
+                guard viewModel.server.currentURL != url else { return }
+                viewModel.setCurrentURL(to: url)
+            } label: {
+                HStack(alignment: .top, spacing: 12) {
+                    Circle()
+                        .fill(viewModel.server.currentURL == url ? Color.red : Color.clear)
+                        .overlay {
+                            Circle()
+                                .stroke(
+                                    viewModel.server.currentURL == url ? Color.red : Color.secondary.opacity(0.4),
+                                    lineWidth: 1
+                                )
+                        }
+                        .frame(width: 10, height: 10)
+                        .padding(.top, 6)
 
-                Text(viewModel.statusText(for: url))
-                    .font(.caption)
-                    .foregroundStyle(statusColor(for: state))
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(url.absoluteString)
+                            .foregroundStyle(.primary)
+                            .multilineTextAlignment(.leading)
 
-                if let detail = state.detail, state.kind != .idle {
-                    Text(detail)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        Text(viewModel.statusText(for: url))
+                            .font(.caption)
+                            .foregroundStyle(statusColor(for: state))
+
+                        if let detail = state.detail, state.kind != .idle {
+                            Text(detail)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
             }
+            .buttonStyle(.plain)
 
             Spacer(minLength: 12)
 
             HStack(spacing: 10) {
+                Button {
+                    viewModel.moveURL(url, direction: .higherPriority)
+                } label: {
+                    Image(systemName: "arrow.up.circle")
+                        .frame(width: 24, height: 24)
+                }
+                .buttonStyle(.borderless)
+                .disabled(!viewModel.canMove(url, direction: .higherPriority))
+
+                Button {
+                    viewModel.moveURL(url, direction: .lowerPriority)
+                } label: {
+                    Image(systemName: "arrow.down.circle")
+                        .frame(width: 24, height: 24)
+                }
+                .buttonStyle(.borderless)
+                .disabled(!viewModel.canMove(url, direction: .lowerPriority))
+
                 Button {
                     Task {
                         await viewModel.testURL(url)
@@ -196,15 +249,6 @@ struct EditServerView: View {
                 }
                 .buttonStyle(.borderless)
                 .disabled(state.kind == .testing || viewModel.isTestingAllURLs || viewModel.isResolvingBestURL)
-
-                Button {
-                    guard viewModel.server.currentURL != url else { return }
-                    viewModel.setCurrentURL(to: url)
-                } label: {
-                    Image(systemName: viewModel.server.currentURL == url ? "checkmark.circle.fill" : "checkmark.circle")
-                        .frame(width: 24, height: 24)
-                }
-                .buttonStyle(.borderless)
             }
             .foregroundStyle(.secondary)
         }

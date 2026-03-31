@@ -156,6 +156,7 @@ final class ConnectToServerViewModel: ViewModel {
             newServer.users = []
         }
 
+        server.persistOrderedURLs([server.currentURL])
         StoredValues[.Server.publicInfo(id: server.id)] = publicInfo
     }
 
@@ -175,6 +176,8 @@ final class ConnectToServerViewModel: ViewModel {
             return editServer.state
         }
 
+        let updatedURLs = newState.prioritizedURLs + [server.currentURL]
+        newState.persistOrderedURLs(updatedURLs)
         Notifications[.didChangeCurrentServerURL].post(newState)
     }
 

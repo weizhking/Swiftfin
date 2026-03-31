@@ -7,6 +7,7 @@
 //
 
 import CoreStore
+import Defaults
 import Factory
 import Foundation
 import JellyfinAPI
@@ -52,19 +53,51 @@ extension SwiftfinStore.State {
 extension ServerState {
 
     var prioritizedURLs: [URL] {
-        let remainingURLs = urls
-            .filter { $0 != currentURL }
+        normalizedURLOrder(
+            urls: urls,
+            orderedURLs: StoredValues[.Server.orderedURLs(id: id)],
+            currentURL: currentURL
+        )
+    }
+
+    private func normalizedURLOrder(
+        urls: Set<URL>,
+        orderedURLs: [URL],
+        currentURL: URL
+    ) -> [URL] {
+        let seedURLs = orderedURLs.isEmpty ? [currentURL] : orderedURLs
+        var seenURLs = Set<URL>()
+
+        let normalizedURLs = seedURLs.filter { url in
+            guard urls.contains(url), !seenURLs.contains(url) else { return false }
+            seenURLs.insert(url)
+            return true
+        }
+
+        let missingURLs = urls
+            .subtracting(normalizedURLs)
             .sorted(using: \.absoluteString)
 
-        return [currentURL] + remainingURLs
+        return normalizedURLs + missingURLs
     }
 
     private func client(for url: URL) -> JellyfinClient {
         JellyfinClient(
-            configuration: .swiftfinConfiguration(url: url),
+            configuration: .swiftfinConfiguration(
+                url: url,
+                accessToken: sessionAccessToken
+            ),
             sessionConfiguration: .swiftfin,
             sessionDelegate: SwiftfinNetworking.sessionDelegate()
         )
+    }
+
+    private var sessionAccessToken: String? {
+        guard let session = Container.shared.currentUserSession(),
+              session.server.id == id
+        else { return nil }
+
+        return session.user.accessToken
     }
 
     func getPublicSystemInfo(for url: URL) async throws -> PublicSystemInfo {
@@ -82,6 +115,18 @@ extension ServerState {
         }
 
         return publicInfo
+    }
+
+    func testBitrate(for url: URL) async throws -> Int {
+        let testSize = Defaults[.VideoPlayer.appMaximumBitrateTest].rawValue
+        let request = Paths.getBitrateTestBytes(size: testSize)
+        let testStartTime = Date()
+        let _ = try await client(for: url).send(request)
+        let testDuration = Date().timeIntervalSince(testStartTime)
+        let testSizeBits = Double(testSize * 8)
+        let testBitrate = testSizeBits / testDuration
+
+        return clamp(Int(testBitrate), min: 1_500_000, max: Int(Int32.max))
     }
 
     private func persistConnection(
@@ -175,5 +220,13 @@ extension ServerState {
         } else {
             return false
         }
+    }
+
+    func persistOrderedURLs(_ orderedURLs: [URL]) {
+        StoredValues[.Server.orderedURLs(id: id)] = normalizedURLOrder(
+            urls: urls,
+            orderedURLs: orderedURLs,
+            currentURL: currentURL
+        )
     }
 }

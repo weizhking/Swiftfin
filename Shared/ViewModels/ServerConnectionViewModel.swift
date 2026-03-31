@@ -13,6 +13,16 @@ import JellyfinAPI
 @MainActor
 final class ServerConnectionViewModel: ViewModel {
 
+    enum MoveDirection {
+        case higherPriority
+        case lowerPriority
+    }
+
+    private struct URLSortMetric {
+        let url: URL
+        let bitrate: Int?
+    }
+
     struct URLCheckState: Equatable {
 
         enum Kind: Equatable {
@@ -57,6 +67,10 @@ final class ServerConnectionViewModel: ViewModel {
         server.prioritizedURLs
     }
 
+    var preferredURL: URL? {
+        prioritizedURLs.first
+    }
+
     func checkState(for url: URL) -> URLCheckState {
         urlCheckStates[url] ?? .idle
     }
@@ -64,6 +78,10 @@ final class ServerConnectionViewModel: ViewModel {
     func statusText(for url: URL) -> String {
         let state = checkState(for: url)
         var parts: [String] = []
+
+        if preferredURL == url {
+            parts.append("Preferred")
+        }
 
         if server.currentURL == url {
             parts.append("Current")
@@ -77,12 +95,86 @@ final class ServerConnectionViewModel: ViewModel {
         case .testing:
             parts.append("Testing...")
         case .reachable:
-            parts.append("Reachable")
+            if parts.isEmpty, state.detail == nil {
+                parts.append("Available")
+            }
         case .failed:
             parts.append("Failed")
         }
 
         return parts.joined(separator: " | ")
+    }
+
+    func canMove(_ url: URL, direction: MoveDirection) -> Bool {
+        guard let index = prioritizedURLs.firstIndex(of: url) else { return false }
+
+        switch direction {
+        case .higherPriority:
+            return index > 0
+        case .lowerPriority:
+            return index < prioritizedURLs.count - 1
+        }
+    }
+
+    func moveURL(_ url: URL, direction: MoveDirection) {
+        guard let index = prioritizedURLs.firstIndex(of: url) else { return }
+
+        let destinationIndex: Int
+
+        switch direction {
+        case .higherPriority:
+            guard index > 0 else { return }
+            destinationIndex = index - 1
+        case .lowerPriority:
+            guard index < prioritizedURLs.count - 1 else { return }
+            destinationIndex = index + 1
+        }
+
+        var newOrder = prioritizedURLs
+        let movedURL = newOrder.remove(at: index)
+        newOrder.insert(movedURL, at: destinationIndex)
+
+        server.persistOrderedURLs(newOrder)
+        objectWillChange.send()
+    }
+
+    func sortURLsByBitrate() async {
+        guard !isTestingAllURLs else { return }
+
+        isTestingAllURLs = true
+        var metrics: [URLSortMetric] = []
+
+        for url in prioritizedURLs {
+            urlCheckStates[url] = .testing
+            let result = await probeURL(url)
+            urlCheckStates[url] = result
+
+            let bitrate = bitrateValue(from: result.detail)
+            metrics.append(.init(url: url, bitrate: bitrate))
+        }
+
+        let sortedURLs = metrics
+            .sorted { lhs, rhs in
+                switch (lhs.bitrate, rhs.bitrate) {
+                case let (left?, right?):
+                    if left != right {
+                        return left > right
+                    }
+                case (.some, nil):
+                    return true
+                case (nil, .some):
+                    return false
+                case (nil, nil):
+                    break
+                }
+
+                return prioritizedURLs.firstIndex(of: lhs.url) ?? 0 < prioritizedURLs.firstIndex(of: rhs.url) ?? 0
+            }
+            .map(\.url)
+
+        server.persistOrderedURLs(sortedURLs)
+        objectWillChange.send()
+        isTestingAllURLs = false
     }
 
     func testURL(_ url: URL) async {
@@ -128,11 +220,50 @@ final class ServerConnectionViewModel: ViewModel {
     private func probeURL(_ url: URL) async -> URLCheckState {
         do {
             let publicInfo = try await server.validateURL(url)
-            let detail = publicInfo.version.map { "Jellyfin \($0)" }
+            let bitrate = try? await server.testBitrate(for: url)
+            let detail = detailText(
+                version: publicInfo.version,
+                bitrate: bitrate
+            )
             return .reachable(detail: detail)
         } catch {
             return .failed(detail: Self.message(for: error))
         }
+    }
+
+    private func detailText(version: String?, bitrate: Int?) -> String? {
+        if let bitrate {
+            return bitrateDisplayTitle(for: bitrate)
+        }
+
+        if let version {
+            return "Jellyfin \(version)"
+        }
+
+        return nil
+    }
+
+    private func bitrateValue(from detail: String?) -> Int? {
+        guard let detail else { return nil }
+
+        return PlaybackBitrate.allCases
+            .filter { $0 != .auto }
+            .first(where: { $0.displayTitle == detail })?
+            .rawValue
+    }
+
+    private func bitrateDisplayTitle(for bitrate: Int) -> String {
+        let orderedBitrates = PlaybackBitrate.allCases
+            .filter { $0 != .auto }
+            .sorted { $0.rawValue < $1.rawValue }
+
+        for candidate in orderedBitrates {
+            if bitrate <= candidate.rawValue {
+                return candidate.displayTitle
+            }
+        }
+
+        return PlaybackBitrate.max.displayTitle
     }
 
     private static func message(for error: Error) -> String {

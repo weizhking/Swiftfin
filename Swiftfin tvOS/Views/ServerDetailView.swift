@@ -75,6 +75,22 @@ struct EditServerView: View {
                             }
                         }
                     }
+
+                    HStack {
+                        Button("Test All URLs") {
+                            Task {
+                                await viewModel.testAllURLs()
+                            }
+                        }
+                        .disabled(viewModel.isTestingAllURLs || viewModel.isResolvingBestURL)
+
+                        Button("Sort by Bitrate") {
+                            Task {
+                                await viewModel.sortURLsByBitrate()
+                            }
+                        }
+                        .disabled(viewModel.isTestingAllURLs || viewModel.isResolvingBestURL)
+                    }
                 } header: {
                     Text(L10n.url)
                 } footer: {
@@ -87,14 +103,7 @@ struct EditServerView: View {
                 }
 
                 Section("URL Tools") {
-                    Button("Test All URLs") {
-                        Task {
-                            await viewModel.testAllURLs()
-                        }
-                    }
-                    .disabled(viewModel.isTestingAllURLs || viewModel.isResolvingBestURL)
-
-                    Button("Select Best Available URL") {
+                    Button("Use Priority Order") {
                         Task {
                             await viewModel.selectBestURL()
                         }
@@ -105,22 +114,56 @@ struct EditServerView: View {
                 Section("Saved URLs") {
                     ForEach(viewModel.prioritizedURLs, id: \.self) { url in
                         HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(url.absoluteString)
-                                    .foregroundStyle(.primary)
+                            Button {
+                                guard viewModel.server.currentURL != url else { return }
+                                viewModel.setCurrentURL(to: url)
+                            } label: {
+                                HStack(alignment: .top, spacing: 12) {
+                                    Circle()
+                                        .fill(viewModel.server.currentURL == url ? Color.red : Color.clear)
+                                        .overlay {
+                                            Circle()
+                                                .stroke(
+                                                    viewModel.server.currentURL == url ? Color.red : Color.secondary.opacity(0.4),
+                                                    lineWidth: 1
+                                                )
+                                        }
+                                        .frame(width: 10, height: 10)
+                                        .padding(.top, 6)
 
-                                Text(viewModel.statusText(for: url))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(url.absoluteString)
+                                            .foregroundStyle(.primary)
 
-                                if let detail = viewModel.checkState(for: url).detail {
-                                    Text(detail)
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
+                                        Text(viewModel.statusText(for: url))
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+
+                                        if let detail = viewModel.checkState(for: url).detail {
+                                            Text(detail)
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
                                 }
                             }
+                            .buttonStyle(.plain)
 
                             Spacer()
+
+                            Button {
+                                viewModel.moveURL(url, direction: .higherPriority)
+                            } label: {
+                                Image(systemName: "arrow.up.circle")
+                            }
+                            .disabled(!viewModel.canMove(url, direction: .higherPriority))
+
+                            Button {
+                                viewModel.moveURL(url, direction: .lowerPriority)
+                            } label: {
+                                Image(systemName: "arrow.down.circle")
+                            }
+                            .disabled(!viewModel.canMove(url, direction: .lowerPriority))
 
                             Button {
                                 Task {

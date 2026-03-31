@@ -46,6 +46,15 @@ extension StoredValues.Keys {
 
     enum Server {
 
+        static func orderedURLs(id: String) -> Key<[URL]> {
+            ServerKey(
+                "orderedURLs",
+                ownerID: id,
+                domain: "orderedURLs",
+                default: []
+            )
+        }
+
         static func publicInfo(id: String) -> Key<PublicSystemInfo> {
             ServerKey(
                 "publicInfo",
