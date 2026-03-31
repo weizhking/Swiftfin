@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   release:
-    name: Build Unsigned iOS IPA
+    name: Build Release Assets
     runs-on: macos-15
 
     steps:
@@ -46,14 +46,36 @@ jobs:
             DEVELOPMENT_TEAM="" \
             -skipMacroValidation
 
+      - name: Build unsigned tvOS app
+        run: |
+          xcodebuild build \
+            -project Swiftfin.xcodeproj \
+            -scheme "Swiftfin tvOS" \
+            -configuration Release \
+            -destination "generic/platform=tvOS" \
+            -derivedDataPath "$RUNNER_TEMP/tvos-derived-data" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            -skipMacroValidation
+
       - name: Package unsigned IPA
         run: |
           mkdir -p Payload
           cp -R "$RUNNER_TEMP/Swiftfin.xcarchive/Products/Applications/Swiftfin iOS.app" Payload/
           /usr/bin/zip -r "Swiftfin-${GITHUB_REF_NAME}-unsigned.ipa" Payload
 
+      - name: Package unsigned tvOS app
+        run: |
+          mkdir -p "Swiftfin-tvOS"
+          cp -R "$RUNNER_TEMP/tvos-derived-data/Build/Products/Release-appletvos/Swiftfin tvOS.app" "Swiftfin-tvOS/"
+          /usr/bin/zip -r "Swiftfin-${GITHUB_REF_NAME}-tvos-unsigned.zip" "Swiftfin-tvOS"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: Swiftfin-${{ github.ref_name }}-unsigned.ipa
+          files: |
+            Swiftfin-${{ github.ref_name }}-unsigned.ipa
+            Swiftfin-${{ github.ref_name }}-tvos-unsigned.zip
           generate_release_notes: true

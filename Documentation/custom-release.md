@@ -20,6 +20,7 @@ To make that work on iOS, this fork includes two custom changes:
 GitHub Actions builds and publishes:
 
 - an unsigned iOS `.ipa`
+- an unsigned tvOS `.app` bundle packaged as `.zip`
 
 The release workflow is defined in [release.yml](../.github/workflows/release.yml).
 
@@ -32,6 +33,12 @@ Typical usage is:
 1. Download the `.ipa` from GitHub Releases.
 2. Re-sign it with your own certificate, signing service, or local signing tool.
 3. Install it on your iPhone or iPad.
+
+For Apple TV / tvOS:
+
+1. Download the tvOS `.zip` asset from GitHub Releases.
+2. Extract the contained `Swiftfin tvOS.app`.
+3. Re-sign it with your own tooling if needed for your deployment flow.
 
 ## Versioning
 
