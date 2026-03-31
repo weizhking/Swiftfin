@@ -23,6 +23,7 @@ final class NetworkPathObserver {
     private let monitor = NWPathMonitor()
     private let queue = DispatchQueue(label: "swiftfin.network-path-monitor")
 
+    private var generation: Int = 0
     private var hasPendingPathChange: Bool = false
     private var isStarted: Bool = false
     private var latestSnapshot: Snapshot?
@@ -49,6 +50,12 @@ final class NetworkPathObserver {
         return didChange
     }
 
+    func currentGeneration() -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return generation
+    }
+
     private func handlePathUpdate(_ path: NWPath) {
         let snapshot = Snapshot(
             status: path.status,
@@ -70,6 +77,7 @@ final class NetworkPathObserver {
         defer { lock.unlock() }
 
         if let latestSnapshot, latestSnapshot != snapshot {
+            generation += 1
             hasPendingPathChange = true
         }
 

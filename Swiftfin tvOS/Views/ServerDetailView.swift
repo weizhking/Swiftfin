@@ -102,15 +102,6 @@ struct EditServerView: View {
                     }
                 }
 
-                Section("URL Tools") {
-                    Button("Use Priority Order") {
-                        Task {
-                            await viewModel.selectBestURL()
-                        }
-                    }
-                    .disabled(viewModel.isTestingAllURLs || viewModel.isResolvingBestURL)
-                }
-
                 Section("Saved URLs") {
                     ForEach(viewModel.prioritizedURLs, id: \.self) { url in
                         HStack {
@@ -120,11 +111,11 @@ struct EditServerView: View {
                             } label: {
                                 HStack(alignment: .top, spacing: 12) {
                                     Circle()
-                                        .fill(viewModel.server.currentURL == url ? Color.red : Color.clear)
+                                        .fill(viewModel.server.currentURL == url ? Color.yellow : Color.clear)
                                         .overlay {
                                             Circle()
                                                 .stroke(
-                                                    viewModel.server.currentURL == url ? Color.red : Color.secondary.opacity(0.4),
+                                                    viewModel.server.currentURL == url ? Color.yellow : Color.secondary.opacity(0.4),
                                                     lineWidth: 1
                                                 )
                                         }

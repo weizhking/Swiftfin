@@ -106,21 +106,6 @@ struct EditServerView: View {
                 }
 
                 if isURLSectionExpanded {
-                    Button {
-                        Task {
-                            await viewModel.selectBestURL()
-                        }
-                    } label: {
-                        HStack {
-                            Label("Use Priority Order", systemImage: "checkmark.circle")
-                            Spacer()
-                            if viewModel.isResolvingBestURL {
-                                ProgressView()
-                            }
-                        }
-                    }
-                    .disabled(viewModel.isTestingAllURLs || viewModel.isResolvingBestURL)
-
                     ForEach(viewModel.prioritizedURLs, id: \.self) { url in
                         serverURLRow(url)
                     }
@@ -181,11 +166,11 @@ struct EditServerView: View {
             } label: {
                 HStack(alignment: .top, spacing: 12) {
                     Circle()
-                        .fill(viewModel.server.currentURL == url ? Color.red : Color.clear)
+                        .fill(viewModel.server.currentURL == url ? Color.yellow : Color.clear)
                         .overlay {
                             Circle()
                                 .stroke(
-                                    viewModel.server.currentURL == url ? Color.red : Color.secondary.opacity(0.4),
+                                    viewModel.server.currentURL == url ? Color.yellow : Color.secondary.opacity(0.4),
                                     lineWidth: 1
                                 )
                         }

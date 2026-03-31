@@ -7,6 +7,7 @@
 //
 
 import CoreStore
+import Factory
 import Foundation
 import JellyfinAPI
 
@@ -58,9 +59,19 @@ final class ServerConnectionViewModel: ViewModel {
     @Published
     var testError: ErrorMessage?
 
+    @Injected(\.serverURLTestCache)
+    private var serverURLTestCache
+
     init(server: ServerState) {
         self.server = server
         super.init()
+
+        if let cachedStates = serverURLTestCache.get(
+            serverID: server.id,
+            generation: networkPathObserver.currentGeneration()
+        ) {
+            self.urlCheckStates = cachedStates.mapValues(Self.urlCheckState(from:))
+        }
     }
 
     var prioritizedURLs: [URL] {
@@ -78,10 +89,6 @@ final class ServerConnectionViewModel: ViewModel {
     func statusText(for url: URL) -> String {
         let state = checkState(for: url)
         var parts: [String] = []
-
-        if preferredURL == url {
-            parts.append("Preferred")
-        }
 
         if server.currentURL == url {
             parts.append("Current")
@@ -142,16 +149,7 @@ final class ServerConnectionViewModel: ViewModel {
         guard !isTestingAllURLs else { return }
 
         isTestingAllURLs = true
-        var metrics: [URLSortMetric] = []
-
-        for url in prioritizedURLs {
-            urlCheckStates[url] = .testing
-            let result = await probeURL(url)
-            urlCheckStates[url] = result
-
-            let bitrate = bitrateValue(from: result.detail)
-            metrics.append(.init(url: url, bitrate: bitrate))
-        }
+        let metrics = await runParallelChecks()
 
         let sortedURLs = metrics
             .sorted { lhs, rhs in
@@ -180,18 +178,14 @@ final class ServerConnectionViewModel: ViewModel {
     func testURL(_ url: URL) async {
         urlCheckStates[url] = .testing
         urlCheckStates[url] = await probeURL(url)
+        persistCheckStates()
     }
 
     func testAllURLs() async {
         guard !isTestingAllURLs else { return }
 
         isTestingAllURLs = true
-
-        for url in prioritizedURLs {
-            urlCheckStates[url] = .testing
-            urlCheckStates[url] = await probeURL(url)
-        }
-
+        let _ = await runParallelChecks()
         isTestingAllURLs = false
     }
 
@@ -231,6 +225,43 @@ final class ServerConnectionViewModel: ViewModel {
         }
     }
 
+    private func runParallelChecks() async -> [URLSortMetric] {
+        let urls = prioritizedURLs
+        let testingStates = Dictionary(uniqueKeysWithValues: urls.map { ($0, URLCheckState.testing) })
+        urlCheckStates.merge(testingStates) { _, new in new }
+
+        let results = await withTaskGroup(
+            of: (URL, URLCheckState, Int?).self,
+            returning: [(URL, URLCheckState, Int?)].self
+        ) { group in
+            for url in urls {
+                let server = self.server
+                group.addTask {
+                    let result = await Self.probeURL(server: server, url: url)
+                    return (
+                        url,
+                        result,
+                        Self.bitrateValue(from: result.detail)
+                    )
+                }
+            }
+
+            var collected: [(URL, URLCheckState, Int?)] = []
+
+            for await result in group {
+                collected.append(result)
+            }
+
+            return collected
+        }
+
+        let states = Dictionary(uniqueKeysWithValues: results.map { ($0.0, $0.1) })
+        urlCheckStates.merge(states) { _, new in new }
+        persistCheckStates()
+
+        return results.map { URLSortMetric(url: $0.0, bitrate: $0.2) }
+    }
+
     private func detailText(version: String?, bitrate: Int?) -> String? {
         if let bitrate {
             return bitrateDisplayTitle(for: bitrate)
@@ -243,7 +274,48 @@ final class ServerConnectionViewModel: ViewModel {
         return nil
     }
 
-    private func bitrateValue(from detail: String?) -> Int? {
+    private static func urlCheckState(from entry: ServerURLTestCache.Entry) -> URLCheckState {
+        switch entry.kind {
+        case .idle:
+            .idle
+        case .testing:
+            .testing
+        case .reachable:
+            .reachable(detail: entry.detail)
+        case .failed:
+            .failed(detail: entry.detail ?? L10n.unknownError)
+        }
+    }
+
+    private func persistCheckStates() {
+        let entries = urlCheckStates.mapValues { state in
+            let kind: ServerURLTestCache.Entry.Kind
+
+            switch state.kind {
+            case .idle:
+                kind = .idle
+            case .testing:
+                kind = .testing
+            case .reachable:
+                kind = .reachable
+            case .failed:
+                kind = .failed
+            }
+
+            return ServerURLTestCache.Entry(
+                kind: kind,
+                detail: state.detail
+            )
+        }
+
+        serverURLTestCache.set(
+            serverID: server.id,
+            generation: networkPathObserver.currentGeneration(),
+            entries: entries
+        )
+    }
+
+    private static func bitrateValue(from detail: String?) -> Int? {
         guard let detail else { return nil }
 
         return PlaybackBitrate.allCases
@@ -252,7 +324,7 @@ final class ServerConnectionViewModel: ViewModel {
             .rawValue
     }
 
-    private func bitrateDisplayTitle(for bitrate: Int) -> String {
+    private static func bitrateDisplayTitle(for bitrate: Int) -> String {
         let orderedBitrates = PlaybackBitrate.allCases
             .filter { $0 != .auto }
             .sorted { $0.rawValue < $1.rawValue }
@@ -264,6 +336,25 @@ final class ServerConnectionViewModel: ViewModel {
         }
 
         return PlaybackBitrate.max.displayTitle
+    }
+
+    private static func probeURL(server: ServerState, url: URL) async -> URLCheckState {
+        do {
+            let publicInfo = try await server.validateURL(url)
+            let bitrate = try? await server.testBitrate(for: url)
+
+            if let bitrate {
+                return .reachable(detail: Self.bitrateDisplayTitle(for: bitrate))
+            }
+
+            if let version = publicInfo.version {
+                return .reachable(detail: "Jellyfin \(version)")
+            }
+
+            return .reachable(detail: nil)
+        } catch {
+            return .failed(detail: message(for: error))
+        }
     }
 
     private static func message(for error: Error) -> String {
