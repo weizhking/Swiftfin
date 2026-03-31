@@ -35,11 +35,19 @@ final class ServerCheckViewModel: ViewModel {
 
     @Function(\Action.Cases.checkServer)
     private func _checkServer() async throws {
-
-        try await userSession.server.updateServerInfo()
+        let server = try await userSession.server.resolveCurrentURL()
+        try await server.updateServerInfo()
 
         let request = Paths.getCurrentUser
-        let response = try await userSession.client.send(request)
+        let client = JellyfinClient(
+            configuration: .swiftfinConfiguration(
+                url: server.currentURL,
+                accessToken: userSession.user.accessToken
+            ),
+            sessionConfiguration: .swiftfin,
+            sessionDelegate: SwiftfinNetworking.sessionDelegate()
+        )
+        let response = try await client.send(request)
 
         userSession.user.data = response.value
         Container.shared.currentUserSession.reset()

@@ -10,14 +10,169 @@ import CoreStore
 import Foundation
 import JellyfinAPI
 
+@MainActor
 final class ServerConnectionViewModel: ViewModel {
+
+    struct URLCheckState: Equatable {
+
+        enum Kind: Equatable {
+            case idle
+            case testing
+            case reachable
+            case failed
+        }
+
+        let kind: Kind
+        let detail: String?
+
+        static let idle = URLCheckState(kind: .idle, detail: nil)
+        static let testing = URLCheckState(kind: .testing, detail: nil)
+
+        static func reachable(detail: String?) -> URLCheckState {
+            .init(kind: .reachable, detail: detail)
+        }
+
+        static func failed(detail: String) -> URLCheckState {
+            .init(kind: .failed, detail: detail)
+        }
+    }
 
     @Published
     private(set) var server: ServerState
+    @Published
+    private(set) var isResolvingBestURL: Bool = false
+    @Published
+    private(set) var isTestingAllURLs: Bool = false
+    @Published
+    private(set) var urlCheckStates: [URL: URLCheckState] = [:]
+    @Published
+    var testError: ErrorMessage?
 
     init(server: ServerState) {
         self.server = server
         super.init()
+    }
+
+    var prioritizedURLs: [URL] {
+        server.prioritizedURLs
+    }
+
+    func checkState(for url: URL) -> URLCheckState {
+        urlCheckStates[url] ?? .idle
+    }
+
+    func statusText(for url: URL) -> String {
+        let state = checkState(for: url)
+        var parts: [String] = []
+
+        if server.currentURL == url {
+            parts.append("Current")
+        }
+
+        switch state.kind {
+        case .idle:
+            if parts.isEmpty {
+                parts.append("Not tested")
+            }
+        case .testing:
+            parts.append("Testing...")
+        case .reachable:
+            parts.append("Reachable")
+        case .failed:
+            parts.append("Failed")
+        }
+
+        return parts.joined(separator: " | ")
+    }
+
+    func testURL(_ url: URL) async {
+        urlCheckStates[url] = .testing
+        urlCheckStates[url] = await probeURL(url)
+    }
+
+    func testAllURLs() async {
+        guard !isTestingAllURLs else { return }
+
+        isTestingAllURLs = true
+
+        for url in prioritizedURLs {
+            urlCheckStates[url] = .testing
+            urlCheckStates[url] = await probeURL(url)
+        }
+
+        isTestingAllURLs = false
+    }
+
+    func selectBestURL() async {
+        guard !isResolvingBestURL else { return }
+
+        isResolvingBestURL = true
+        let previousURL = server.currentURL
+
+        do {
+            let newState = try await server.resolveCurrentURL()
+            server = newState
+
+            if newState.currentURL != previousURL {
+                Notifications[.didChangeCurrentServerURL].post(newState)
+            }
+
+            await testAllURLs()
+        } catch {
+            testError = ErrorMessage(Self.message(for: error))
+        }
+
+        isResolvingBestURL = false
+    }
+
+    private func probeURL(_ url: URL) async -> URLCheckState {
+        do {
+            let publicInfo = try await server.validateURL(url)
+            let detail = publicInfo.version.map { "Jellyfin \($0)" }
+            return .reachable(detail: detail)
+        } catch {
+            return .failed(detail: Self.message(for: error))
+        }
+    }
+
+    private static func message(for error: Error) -> String {
+        if let error = error as? ErrorMessage,
+           let description = error.errorDescription
+        {
+            return description
+        }
+
+        let nsError = error as NSError
+
+        if nsError.domain == NSURLErrorDomain,
+           let code = URLError.Code(rawValue: nsError.code)
+        {
+            switch code {
+            case .cannotConnectToHost:
+                return L10n.cannotConnectToHost
+            case .cannotFindHost:
+                return L10n.unableToFindHost
+            case .notConnectedToInternet,
+                 .networkConnectionLost:
+                return "Network unavailable"
+            case .timedOut:
+                return L10n.networkTimedOut
+            case .userAuthenticationRequired:
+                return L10n.unauthorized
+            case .secureConnectionFailed,
+                 .serverCertificateHasBadDate,
+                 .serverCertificateHasUnknownRoot,
+                 .serverCertificateNotYetValid,
+                 .serverCertificateUntrusted,
+                 .clientCertificateRejected,
+                 .clientCertificateRequired:
+                return "TLS failed"
+            default:
+                break
+            }
+        }
+
+        return error.localizedDescription
     }
 
     // TODO: this could probably be cleaner

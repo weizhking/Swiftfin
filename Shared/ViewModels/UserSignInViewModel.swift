@@ -97,15 +97,24 @@ final class UserSignInViewModel: ViewModel {
     @Published
     private(set) var serverDisclaimer: String? = nil
 
-    let server: ServerState
+    @Published
+    private(set) var server: ServerState
 
     init(server: ServerState) {
         self.server = server
         super.init()
     }
 
+    private func resolveServer() async throws -> ServerState {
+        let resolvedServer = try await server.resolveCurrentURL()
+        self.server = resolvedServer
+        return resolvedServer
+    }
+
     @Function(\Action.Cases.getPublicData)
     private func _getPublicData() async throws {
+        _ = try await resolveServer()
+
         async let isQuickConnectEnabled = try retrieveIsQuickConnectEnabled()
         async let publicUsers = try retrievePublicUsers()
         async let serverDisclaimer = try retrieveServerDisclaimer()
@@ -120,6 +129,8 @@ final class UserSignInViewModel: ViewModel {
         _ username: String,
         _ password: String
     ) async throws {
+        let server = try await resolveServer()
+
         let username = username
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: .objectReplacement)
@@ -156,6 +167,8 @@ final class UserSignInViewModel: ViewModel {
     private func _signInQuickConnect(
         _ secret: String
     ) async throws {
+        let server = try await resolveServer()
+
         let response = try await server.client.signIn(quickConnectSecret: secret)
 
         guard let accessToken = response.accessToken,

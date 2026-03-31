@@ -41,6 +41,13 @@ This fork uses release tags like:
 - `v1.4.0-https.2`
 - `v1.4.0-https.3`
 
+For test builds, this fork can also publish prereleases with tags like:
+
+- `v1.4.0-https.3-beta.1`
+- `v1.4.0-https.3-pre.1`
+
+Tags containing `-beta.` or `-pre.` are published as GitHub prereleases.
+
 The intent is to preserve the upstream `1.4` base while making custom fork builds easy to identify.
 
 ## Notes

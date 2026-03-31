@@ -44,10 +44,10 @@ struct EditServerView: View {
                     )
                     .focusable(false)
 
-                    if let serverVerion = StoredValues[.Server.publicInfo(id: viewModel.server.id)].version {
+                    if let serverVersion = StoredValues[.Server.publicInfo(id: viewModel.server.id)].version {
                         LabeledContent(
                             L10n.version,
-                            value: serverVerion
+                            value: serverVersion
                         )
                         .focusable(false)
                     }
@@ -55,7 +55,7 @@ struct EditServerView: View {
 
                 Section {
                     ListRowMenu(L10n.serverURL, subtitle: viewModel.server.currentURL.absoluteString) {
-                        ForEach(viewModel.server.urls.sorted(using: \.absoluteString), id: \.self) { url in
+                        ForEach(viewModel.prioritizedURLs, id: \.self) { url in
                             Button {
                                 guard viewModel.server.currentURL != url else { return }
                                 viewModel.setCurrentURL(to: url)
@@ -86,6 +86,54 @@ struct EditServerView: View {
                     }
                 }
 
+                Section("URL Tools") {
+                    Button("Test All URLs") {
+                        Task {
+                            await viewModel.testAllURLs()
+                        }
+                    }
+                    .disabled(viewModel.isTestingAllURLs || viewModel.isResolvingBestURL)
+
+                    Button("Select Best Available URL") {
+                        Task {
+                            await viewModel.selectBestURL()
+                        }
+                    }
+                    .disabled(viewModel.isTestingAllURLs || viewModel.isResolvingBestURL)
+                }
+
+                Section("Saved URLs") {
+                    ForEach(viewModel.prioritizedURLs, id: \.self) { url in
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(url.absoluteString)
+                                    .foregroundStyle(.primary)
+
+                                Text(viewModel.statusText(for: url))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+
+                                if let detail = viewModel.checkState(for: url).detail {
+                                    Text(detail)
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+
+                            Spacer()
+
+                            Button {
+                                Task {
+                                    await viewModel.testURL(url)
+                                }
+                            } label: {
+                                Image(systemName: "arrow.triangle.2.circlepath.circle")
+                            }
+                            .disabled(viewModel.isTestingAllURLs || viewModel.isResolvingBestURL)
+                        }
+                    }
+                }
+
                 if isEditing {
                     Section {
                         ListRowButton(L10n.delete, role: .destructive) {
@@ -97,10 +145,24 @@ struct EditServerView: View {
                 }
             }
             .navigationTitle(L10n.server)
+            .alert(L10n.errorDetails, isPresented: Binding(
+                get: { viewModel.testError != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        viewModel.testError = nil
+                    }
+                }
+            )) {
+                Button(L10n.ok) {
+                    viewModel.testError = nil
+                }
+            } message: {
+                Text(viewModel.testError?.localizedDescription ?? L10n.unknownError)
+            }
             .alert(L10n.deleteServer, isPresented: $isPresentingConfirmDeletion) {
                 Button(L10n.delete, role: .destructive) {
                     viewModel.delete()
-//                    router.popLast()
+                    router.dismiss()
                 }
             } message: {
                 Text(L10n.confirmDeleteServerAndUsers(viewModel.server.name))

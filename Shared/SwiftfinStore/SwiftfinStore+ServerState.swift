@@ -10,6 +10,7 @@ import CoreStore
 import Factory
 import Foundation
 import JellyfinAPI
+import Logging
 import Pulse
 
 extension SwiftfinStore.State {
@@ -50,6 +51,86 @@ extension SwiftfinStore.State {
 
 extension ServerState {
 
+    var prioritizedURLs: [URL] {
+        let remainingURLs = urls
+            .filter { $0 != currentURL }
+            .sorted(using: \.absoluteString)
+
+        return [currentURL] + remainingURLs
+    }
+
+    private func client(for url: URL) -> JellyfinClient {
+        JellyfinClient(
+            configuration: .swiftfinConfiguration(url: url),
+            sessionConfiguration: .swiftfin,
+            sessionDelegate: SwiftfinNetworking.sessionDelegate()
+        )
+    }
+
+    func getPublicSystemInfo(for url: URL) async throws -> PublicSystemInfo {
+        let request = Paths.getPublicSystemInfo
+        let response = try await client(for: url).send(request)
+
+        return response.value
+    }
+
+    func validateURL(_ url: URL) async throws -> PublicSystemInfo {
+        let publicInfo = try await getPublicSystemInfo(for: url)
+
+        guard let candidateID = publicInfo.id, candidateID == id else {
+            throw ErrorMessage("Server identifier mismatch")
+        }
+
+        return publicInfo
+    }
+
+    private func persistConnection(
+        url: URL,
+        publicInfo: PublicSystemInfo
+    ) throws -> ServerState {
+        try SwiftfinStore.dataStack.perform { transaction in
+            guard let storedServer = try transaction.fetchOne(From<ServerModel>().where(\.$id == id)) else {
+                throw ErrorMessage("Unable to find server for connection update")
+            }
+
+            storedServer.currentURL = url
+            storedServer.name = publicInfo.serverName ?? storedServer.name
+            storedServer.id = publicInfo.id ?? storedServer.id
+
+            return storedServer.state
+        }
+    }
+
+    @MainActor
+    func resolveCurrentURL() async throws -> ServerState {
+        let logger = Logger.swiftfin()
+        var lastError: Error?
+
+        for candidateURL in prioritizedURLs {
+            do {
+                let publicInfo = try await validateURL(candidateURL)
+
+                StoredValues[.Server.publicInfo(id: id)] = publicInfo
+
+                if candidateURL == currentURL {
+                    logger.info("Confirmed current URL for server \(self.name): \(candidateURL.absoluteString)")
+                } else {
+                    logger.info("Switching server \(self.name) to reachable URL: \(candidateURL.absoluteString)")
+                }
+
+                return try persistConnection(
+                    url: candidateURL,
+                    publicInfo: publicInfo
+                )
+            } catch {
+                lastError = error
+                logger.warning("Server URL failed for \(self.name): \(candidateURL.absoluteString) (\(error.localizedDescription))")
+            }
+        }
+
+        throw lastError ?? ErrorMessage("Unable to connect to any saved URL for \(name)")
+    }
+
     /// Deletes the model that this state represents and
     /// all settings from `StoredValues`.
     func delete() throws {
@@ -67,11 +148,7 @@ extension ServerState {
     }
 
     func getPublicSystemInfo() async throws -> PublicSystemInfo {
-
-        let request = Paths.getPublicSystemInfo
-        let response = try await client.send(request)
-
-        return response.value
+        try await getPublicSystemInfo(for: currentURL)
     }
 
     var splashScreenImageSource: ImageSource {
@@ -81,20 +158,13 @@ extension ServerState {
 
     @MainActor
     func updateServerInfo() async throws {
-        guard let server = try? SwiftfinStore.dataStack.fetchOne(
-            From<ServerModel>().where(Where(\.$id == id))
-        ) else { return }
-
         let publicInfo = try await getPublicSystemInfo()
+        _ = try persistConnection(
+            url: currentURL,
+            publicInfo: publicInfo
+        )
 
-        try SwiftfinStore.dataStack.perform { transaction in
-            guard let newServer = transaction.edit(server) else { return }
-
-            newServer.name = publicInfo.serverName ?? newServer.name
-            newServer.id = publicInfo.id ?? newServer.id
-        }
-
-        StoredValues[.Server.publicInfo(id: server.id)] = publicInfo
+        StoredValues[.Server.publicInfo(id: id)] = publicInfo
     }
 
     var isVersionCompatible: Bool {
