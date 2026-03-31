@@ -1,5 +1,5 @@
 blank_issues_enabled: true
 contact_links:
-  - name: Jellyfin documentation
-    url:  https://jellyfin.org/docs/general/getting-help.html
-    about: Our documentation contains lots of help for common issues
+  - name: Upstream Swiftfin
+    url: https://github.com/jellyfin/Swiftfin
+    about: For issues unrelated to this fork's HTTPS compatibility changes, please use the upstream Swiftfin repository.

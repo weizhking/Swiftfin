@@ -14,7 +14,7 @@ body:
       label: "This feature request respects the following points:"
       description: Please help us by ensuring that you meet all the following conditions.
       options:
-        - label: This feature has **not** already been requested on [GitHub](https://github.com/jellyfin/Swiftfin/issues?q=is%3Aissue%20state%3Aopen%20type%3AFeature).
+        - label: This feature has **not** already been requested on [GitHub](https://github.com/weizhking/Swiftfin-HTTPS/issues).
           required: true
         - label: I agree to follow Jellyfin's [Code of Conduct](https://jellyfin.org/docs/general/community-standards.html#code-of-conduct).
           required: true

@@ -15,11 +15,11 @@ body:
       label: "This issue respects the following points:"
       description: Please help us by ensuring that you meet all the following conditions.
       options:
-        - label: This is a **bug**, not a question or a configuration issue; Please visit our [forum or chat rooms](https://jellyfin.org/contact/) first to troubleshoot with volunteers, before creating a report.
+        - label: This is a **bug**, not a question or a configuration issue.
           required: true
-        - label: This issue is **not** already reported on [GitHub](https://github.com/jellyfin/Swiftfin/issues?q=is%3Aopen+is%3Aissue).
+        - label: This issue is **not** already reported on [GitHub](https://github.com/weizhking/Swiftfin-HTTPS/issues).
           required: true
-        - label: I'm using an up to date version of Swiftfin; We generally do not support previous older versions. If possible, please update to the latest version before opening an issue.
+        - label: I'm using an up to date version of this fork. If possible, please update to the latest release before opening an issue.
           required: true
         - label: I agree to follow Jellyfin's [Code of Conduct](https://jellyfin.org/docs/general/community-standards.html#code-of-conduct).
           required: true
@@ -64,8 +64,8 @@ body:
     id: app-version
     attributes:
       label: Application version
-      description: The version of the installed Swiftfin app.
-      placeholder: 1.3.1, 1.0.1
+      description: The version of the installed Swiftfin-HTTPS app.
+      placeholder: 1.4.0-https.1
     validations:
       required: true
 
@@ -73,11 +73,11 @@ body:
     id: installation-source
     attributes:
       label: Where did you install the app from?
-      description: Choose the appropriate app store or installation method.
+      description: Choose the installation method used for this fork.
       options:
-        - App Store
-        - TestFlight
-        - GitHub
+        - GitHub Release
+        - Manual build
+        - Other
 
   - type: input
     id: device-info
