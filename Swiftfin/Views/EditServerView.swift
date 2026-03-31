@@ -216,26 +216,25 @@ struct EditServerView: View {
                 }
                 .buttonStyle(.borderless)
                 .disabled(!viewModel.canMove(url, direction: .lowerPriority))
-
-                Button {
-                    Task {
-                        await viewModel.testURL(url)
-                    }
-                } label: {
-                    Group {
-                        if state.kind == .testing {
-                            ProgressView()
-                                .controlSize(.small)
-                        } else {
-                            Image(systemName: "arrow.triangle.2.circlepath.circle")
-                        }
-                    }
-                    .frame(width: 24, height: 24)
-                }
-                .buttonStyle(.borderless)
-                .disabled(state.kind == .testing || viewModel.isTestingAllURLs || viewModel.isResolvingBestURL)
             }
             .foregroundStyle(.secondary)
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            Button {
+                Task {
+                    await viewModel.testURL(url)
+                }
+            } label: {
+                Label("Test", systemImage: "arrow.triangle.2.circlepath.circle")
+            }
+            .tint(.blue)
+
+            Button(role: .destructive) {
+                viewModel.deleteURL(url)
+            } label: {
+                Label(L10n.delete, systemImage: "trash")
+            }
+            .disabled(!viewModel.canDeleteURL(url))
         }
     }
 

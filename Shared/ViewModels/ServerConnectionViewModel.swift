@@ -141,6 +141,49 @@ final class ServerConnectionViewModel: ViewModel {
         objectWillChange.send()
     }
 
+    func canDeleteURL(_ url: URL) -> Bool {
+        prioritizedURLs.count > 1 && prioritizedURLs.contains(url)
+    }
+
+    func deleteURL(_ url: URL) {
+        guard canDeleteURL(url) else {
+            testError = ErrorMessage("At least one URL must remain")
+            return
+        }
+
+        do {
+            let previousCurrentURL = server.currentURL
+            let remainingOrderedURLs = prioritizedURLs.filter { $0 != url }
+
+            let newState = try dataStack.perform { transaction in
+                guard let storedServer = try transaction.fetchOne(From<ServerModel>().where(\.$id == self.server.id)) else {
+                    throw ErrorMessage("Unable to find server for URL deletion: \(self.server.name)")
+                }
+
+                storedServer.urls.remove(url)
+
+                if storedServer.currentURL == url,
+                   let replacementURL = remainingOrderedURLs.first
+                {
+                    storedServer.currentURL = replacementURL
+                }
+
+                return storedServer.state
+            }
+
+            server = newState
+            server.persistOrderedURLs(remainingOrderedURLs)
+            urlCheckStates.removeValue(forKey: url)
+            persistCheckStates()
+
+            if newState.currentURL != previousCurrentURL {
+                Notifications[.didChangeCurrentServerURL].post(newState)
+            }
+        } catch {
+            testError = ErrorMessage(error.localizedDescription)
+        }
+    }
+
     func sortURLsByBitrate() async {
         guard !isTestingAllURLs else { return }
 
@@ -260,7 +303,7 @@ final class ServerConnectionViewModel: ViewModel {
 
     private func detailText(version: String?, bitrate: Int?) -> String? {
         if let bitrate {
-            return bitrateDisplayTitle(for: bitrate)
+            return Self.bitrateDisplayTitle(for: bitrate)
         }
 
         if let version {
