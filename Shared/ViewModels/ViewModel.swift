@@ -20,6 +20,9 @@ class ViewModel: ObservableObject {
     @Injected(\.keychainService)
     var keychain
 
+    @Injected(\.networkPathObserver)
+    var networkPathObserver
+
     let logger = Logger.swiftfin()
 
     /// The current *signed in* user session
@@ -41,6 +44,21 @@ class ViewModel: ObservableObject {
     func withConnectionRecovery<T>(
         _ operation: @escaping () async throws -> T
     ) async throws -> T {
+        if let currentSession = userSession,
+           networkPathObserver.consumePendingPathChange()
+        {
+            do {
+                let resolvedServer = try await currentSession.server.resolveCurrentURL()
+
+                if resolvedServer.currentURL != currentSession.server.currentURL {
+                    Notifications[.didChangeCurrentServerURL].post(resolvedServer)
+                    $userSession.resolve(reset: .scope)
+                }
+            } catch {
+                logger.warning("Unable to resolve server URL after network change: \(error.localizedDescription)")
+            }
+        }
+
         do {
             return try await operation()
         } catch {

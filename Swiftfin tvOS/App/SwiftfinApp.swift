@@ -54,6 +54,10 @@ struct SwiftfinApp: App {
 
         UINavigationBar.appearance().titleTextAttributes = [.foregroundColor: UIColor.label]
 
+        // Swiftfin
+
+        Container.shared.networkPathObserver().start()
+
         // don't keep last user id
         if Defaults[.signOutOnClose] {
             Defaults[.lastSignedInUserID] = .signedOut
