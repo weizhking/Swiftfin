@@ -21,6 +21,18 @@
   <b>Swiftfin</b> is a modern video client for the <a href="https://github.com/jellyfin/jellyfin">Jellyfin</a> media server. Made using Swift to maximize direct play with the power of <b>VLC</b> and look <b>native</b> on all classes of Apple devices.
 </p>
 
+## Custom Fork Notes
+
+This fork is maintained for personal use based on the upstream `1.4` tag.
+
+The main customizations in this fork are:
+
+- allows connecting to Jellyfin servers that use untrusted or self-signed HTTPS certificates
+- proxies media playback through a local `127.0.0.1` bridge so iOS playback can work with those HTTPS servers
+- publishes unsigned iOS `.ipa` files through GitHub Releases for re-signing with your own tools or certificates
+
+See [Documentation/custom-release.md](./Documentation/custom-release.md) for the release workflow and usage notes.
+
 ## ⚡️ Download
 
 <a href="https://apps.apple.com/us/app/swiftfin/id1604098728">
