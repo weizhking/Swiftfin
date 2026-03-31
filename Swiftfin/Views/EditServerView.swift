@@ -49,7 +49,7 @@ struct EditServerView: View {
                 }
             }
 
-            Section {
+            Section(L10n.url) {
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         isURLSectionExpanded.toggle()
@@ -110,8 +110,6 @@ struct EditServerView: View {
                         serverURLRow(url)
                     }
                 }
-            } header: {
-                Text(L10n.url)
             } footer: {
                 if !viewModel.server.isVersionCompatible {
                     Label(
