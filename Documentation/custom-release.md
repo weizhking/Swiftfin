@@ -6,7 +6,7 @@ This repository is a public fork of `jellyfin/Swiftfin`, currently based on the 
 
 This fork exists to support Jellyfin servers that:
 
-- is exposed over `HTTPS`
+- are exposed over `HTTPS`
 - uses an untrusted or self-signed certificate
 - cannot be accessed over plain `HTTP`
 
@@ -37,9 +37,9 @@ These assets are intended as build outputs for this custom fork.
 
 This fork uses release tags like:
 
-- `v1.4.0-nas.1`
-- `v1.4.0-nas.2`
-- `v1.4.0-nas.3`
+- `v1.4.0-https.1`
+- `v1.4.0-https.2`
+- `v1.4.0-https.3`
 
 The intent is to preserve the upstream `1.4` base while making custom fork builds easy to identify.
 
