@@ -22,6 +22,7 @@ final class LocalMediaProxyService {
     private var listener: NWListener?
     private var isStarted = false
     private var activeConnections: [UUID: ProxyConnection] = [:]
+    private var activeTargets: [String: URL] = [:]
 
     private init() {
         start()
@@ -30,15 +31,14 @@ final class LocalMediaProxyService {
     func proxiedURL(for remoteURL: URL) -> URL {
         start()
 
+        let token = registerTarget(for: remoteURL)
+
         var components = URLComponents()
 
         components.scheme = "http"
         components.host = host
         components.port = Int(port)
-        components.path = "/proxy"
-        components.queryItems = [
-            URLQueryItem(name: "target", value: encodedTarget(for: remoteURL))
-        ]
+        components.path = "/proxy/\(token)"
 
         let proxiedURL = components.url ?? remoteURL
         logger.debug("Local media proxy rewrote URL \(remoteURL.absoluteString) -> \(proxiedURL.absoluteString)")
@@ -129,6 +129,20 @@ final class LocalMediaProxyService {
     fileprivate func unregister(_ id: UUID) {
         queue.async {
             self.activeConnections.removeValue(forKey: id)
+        }
+    }
+
+    private func registerTarget(for remoteURL: URL) -> String {
+        queue.sync {
+            let token = UUID().uuidString.lowercased()
+            activeTargets[token] = remoteURL
+            return token
+        }
+    }
+
+    fileprivate func targetURL(for token: String) -> URL? {
+        queue.sync {
+            activeTargets[token]
         }
     }
 
@@ -298,6 +312,17 @@ private extension LocalMediaProxyService {
         }
 
         private func remoteURL(from target: String) -> URL? {
+            if target.hasPrefix("/proxy/") {
+                let token = String(target.dropFirst("/proxy/".count))
+
+                if let registeredTarget = service.targetURL(for: token) {
+                    return registeredTarget
+                }
+
+                service.logger.error("Local media proxy could not find target for token \(token)")
+                return nil
+            }
+
             guard let components = URLComponents(string: "http://localhost\(target)"),
                   let queryItems = components.queryItems
             else {
