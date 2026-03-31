@@ -195,19 +195,21 @@ class ItemViewModel: ViewModel, Stateful {
             refreshTask = Task { [weak self] in
                 guard let self else { return }
                 do {
-                    async let fullItem = getFullItem()
-                    async let similarItems = getSimilarItems()
-                    async let specialFeatures = getSpecialFeatures()
-                    async let localTrailers = getLocalTrailers()
-                    async let additionalParts = getAdditionalParts()
+                    let results = try await withConnectionRecovery {
+                        async let fullItem = self.getFullItem()
+                        async let similarItems = self.getSimilarItems()
+                        async let specialFeatures = self.getSpecialFeatures()
+                        async let localTrailers = self.getLocalTrailers()
+                        async let additionalParts = self.getAdditionalParts()
 
-                    let results = try await (
-                        fullItem: fullItem,
-                        similarItems: similarItems,
-                        specialFeatures: specialFeatures,
-                        localTrailers: localTrailers,
-                        additionalParts: additionalParts
-                    )
+                        return try await (
+                            fullItem: fullItem,
+                            similarItems: similarItems,
+                            specialFeatures: specialFeatures,
+                            localTrailers: localTrailers,
+                            additionalParts: additionalParts
+                        )
+                    }
 
                     guard !Task.isCancelled else { return }
 

@@ -155,20 +155,23 @@ final class HomeViewModel: ViewModel, Stateful {
     }
 
     private func refresh() async throws {
+        let refreshResult = try await withConnectionRecovery {
+            await self.nextUpViewModel.send(.refresh)
+            await self.recentlyAddedViewModel.send(.refresh)
 
-        await nextUpViewModel.send(.refresh)
-        await recentlyAddedViewModel.send(.refresh)
+            let resumeItems = try await self.getResumeItems()
+            let libraries = try await self.getLibraries()
 
-        let resumeItems = try await getResumeItems()
-        let libraries = try await getLibraries()
-
-        for library in libraries {
-            await library.send(.refresh)
+            return (resumeItems, libraries)
         }
 
         await MainActor.run {
-            self.resumeItems.elements = resumeItems
-            self.libraries = libraries
+            self.resumeItems.elements = refreshResult.0
+            self.libraries = refreshResult.1
+        }
+
+        for library in refreshResult.1 {
+            await library.send(.refresh)
         }
     }
 

@@ -37,4 +37,53 @@ class ViewModel: ObservableObject {
                 self?.$userSession.resolve(reset: .scope)
             }
     }
+
+    func withConnectionRecovery<T>(
+        _ operation: @escaping () async throws -> T
+    ) async throws -> T {
+        do {
+            return try await operation()
+        } catch {
+            guard shouldAttemptConnectionRecovery(for: error),
+                  let currentSession = userSession
+            else {
+                throw error
+            }
+
+            let resolvedServer = try await currentSession.server.resolveCurrentURL()
+
+            if resolvedServer.currentURL != currentSession.server.currentURL {
+                Notifications[.didChangeCurrentServerURL].post(resolvedServer)
+                $userSession.resolve(reset: .scope)
+            }
+
+            return try await operation()
+        }
+    }
+
+    private func shouldAttemptConnectionRecovery(for error: Error) -> Bool {
+        let nsError = error as NSError
+
+        guard nsError.domain == NSURLErrorDomain else { return false }
+
+        let code = URLError.Code(rawValue: nsError.code)
+
+        switch code {
+        case .timedOut,
+             .cannotFindHost,
+             .cannotConnectToHost,
+             .networkConnectionLost,
+             .notConnectedToInternet,
+             .secureConnectionFailed,
+             .serverCertificateHasBadDate,
+             .serverCertificateHasUnknownRoot,
+             .serverCertificateNotYetValid,
+             .serverCertificateUntrusted,
+             .clientCertificateRejected,
+             .clientCertificateRequired:
+            return true
+        default:
+            return false
+        }
+    }
 }

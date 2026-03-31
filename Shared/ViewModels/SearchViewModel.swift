@@ -94,46 +94,48 @@ final class SearchViewModel: ViewModel {
             return
         }
 
-        let newItems = try await withThrowingTaskGroup(
-            of: (BaseItemKind, [BaseItemDto]).self,
-            returning: [BaseItemKind: [BaseItemDto]].self
-        ) { group in
+        let newItems = try await withConnectionRecovery {
+            try await withThrowingTaskGroup(
+                of: (BaseItemKind, [BaseItemDto]).self,
+                returning: [BaseItemKind: [BaseItemDto]].self
+            ) { group in
 
-            // Base items
-            let retrievingItemTypes: [BaseItemKind] = [
-                .boxSet,
-                .episode,
-                .movie,
-                .musicArtist,
-                .musicVideo,
-                .liveTvProgram,
-                .series,
-                .tvChannel,
-                .video,
-            ]
+                // Base items
+                let retrievingItemTypes: [BaseItemKind] = [
+                    .boxSet,
+                    .episode,
+                    .movie,
+                    .musicArtist,
+                    .musicVideo,
+                    .liveTvProgram,
+                    .series,
+                    .tvChannel,
+                    .video,
+                ]
 
-            for type in retrievingItemTypes {
+                for type in retrievingItemTypes {
+                    group.addTask {
+                        let items = try await self._getItems(query: query, itemType: type)
+                        return (type, items)
+                    }
+                }
+
+                // People
                 group.addTask {
-                    let items = try await self._getItems(query: query, itemType: type)
-                    return (type, items)
+                    let items = try await self._getPeople(query: query)
+                    return (BaseItemKind.person, items)
                 }
-            }
 
-            // People
-            group.addTask {
-                let items = try await self._getPeople(query: query)
-                return (BaseItemKind.person, items)
-            }
+                var result: [BaseItemKind: [BaseItemDto]] = [:]
 
-            var result: [BaseItemKind: [BaseItemDto]] = [:]
-
-            while let items = try await group.next() {
-                if items.1.isNotEmpty {
-                    result[items.0] = items.1
+                while let items = try await group.next() {
+                    if items.1.isNotEmpty {
+                        result[items.0] = items.1
+                    }
                 }
-            }
 
-            return result
+                return result
+            }
         }
 
         guard !Task.isCancelled else { return }
@@ -193,14 +195,16 @@ final class SearchViewModel: ViewModel {
 
         filterViewModel.send(.getQueryFilters)
 
-        var parameters = Paths.GetItemsByUserIDParameters()
-        parameters.includeItemTypes = [.movie, .series]
-        parameters.isRecursive = true
-        parameters.limit = 10
-        parameters.sortBy = [ItemSortBy.random.rawValue]
+        let response = try await withConnectionRecovery {
+            var parameters = Paths.GetItemsByUserIDParameters()
+            parameters.includeItemTypes = [.movie, .series]
+            parameters.isRecursive = true
+            parameters.limit = 10
+            parameters.sortBy = [ItemSortBy.random.rawValue]
 
-        let request = Paths.getItemsByUserID(userID: userSession.user.id, parameters: parameters)
-        let response = try await userSession.client.send(request)
+            let request = Paths.getItemsByUserID(userID: self.userSession.user.id, parameters: parameters)
+            return try await self.userSession.client.send(request)
+        }
 
         self.suggestions = response.value.items ?? []
     }
