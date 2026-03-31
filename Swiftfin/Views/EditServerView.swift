@@ -120,7 +120,7 @@ struct EditServerView: View {
                     )
                     .labelStyle(.sectionFooterWithImage(imageStyle: .orange))
                 }
-            }
+            })
 
             if isEditing {
                 ListRowButton(L10n.delete) {
